@@ -33,11 +33,17 @@ fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
 }
 
 #[derive(Debug)]
-struct SocketError;
+struct SocketError {
+    filepath: String,
+    err: String,
+}
 
 impl SocketError {
-    fn new(_e: &::std::io::Error) -> Box<Self> {
-        Box::new(SocketError {})
+    fn new(path: &Path, _e: &::std::io::Error) -> Box<Self> {
+        Box::new(SocketError {
+            filepath: path.to_str().unwrap().to_string(),
+            err: _e.to_string(),
+        })
     }
 }
 
@@ -45,12 +51,16 @@ impl Error for SocketError {}
 
 impl fmt::Display for SocketError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SocketError")
+        write!(
+            f,
+            "Unable to create socket '{}' due following error: {}",
+            self.filepath, self.err
+        )
     }
 }
 
 fn get_socket(args: &ArgMatches) -> Result<UnixListener, Box<SocketError>> {
     let arg = args.value_of(SOCKET).unwrap();
     let path = Path::new(arg);
-    UnixListener::bind(path).map_err(|e| SocketError::new(&e))
+    UnixListener::bind(path).map_err(|e| SocketError::new(path, &e))
 }
