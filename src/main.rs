@@ -1,5 +1,6 @@
+use std::fs;
 use std::io::Read;
-use std::{error::Error, os::unix::net::UnixListener, path::Path, process, thread};
+use std::{error::Error, os::unix::net::UnixListener, path::Path, path::PathBuf, process, thread};
 use std::{fmt, os::unix::net::UnixStream};
 
 use app::{create_app, SOCKET};
@@ -34,14 +35,14 @@ fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
 
 #[derive(Debug)]
 struct SocketError {
-    filepath: String,
+    filepath: PathBuf,
     err: String,
 }
 
 impl SocketError {
-    fn new(path: &Path, _e: &::std::io::Error) -> Box<Self> {
+    fn new(path: PathBuf, _e: &::std::io::Error) -> Box<Self> {
         Box::new(SocketError {
-            filepath: path.to_str().unwrap().to_string(),
+            filepath: path.clone(),
             err: _e.to_string(),
         })
     }
@@ -54,13 +55,25 @@ impl fmt::Display for SocketError {
         write!(
             f,
             "Unable to create socket '{}' due following error: {}",
-            self.filepath, self.err
+            self.filepath.to_str().unwrap(),
+            self.err
         )
     }
 }
 
-fn get_socket(args: &ArgMatches) -> Result<UnixListener, Box<SocketError>> {
+fn create_socket(path: PathBuf) -> Result<UnixListener, Box<SocketError>> {
+    UnixListener::bind(&path).map_err(|e| SocketError::new(path, &e))
+}
+
+fn get_socket_path(args: &ArgMatches) -> PathBuf {
     let arg = args.value_of(SOCKET).unwrap();
-    let path = Path::new(arg);
-    UnixListener::bind(path).map_err(|e| SocketError::new(path, &e))
+    Path::new(arg).to_path_buf()
+}
+
+fn get_socket(args: &ArgMatches) -> Result<UnixListener, Box<SocketError>> {
+    let path = get_socket_path(args);
+    if path.exists() {
+        fs::remove_file(&path);
+    }
+    create_socket(path)
 }
