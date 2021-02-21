@@ -7,6 +7,7 @@ use app::{create_app, SOCKET};
 use clap::ArgMatches;
 
 mod app;
+mod dbus;
 
 fn main() {
     let args = create_app().get_matches();
@@ -19,7 +20,8 @@ fn main() {
 fn handle_socket(mut stream: UnixStream) -> () {
     let mut res = String::new();
     stream.read_to_string(&mut res).unwrap();
-    println!("Received: {}", res);
+    dbus::update_status(&res).unwrap();
+    ()
 }
 
 fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
@@ -27,7 +29,7 @@ fn run(args: ArgMatches) -> Result<(), Box<dyn Error>> {
     for stream in socket.incoming() {
         match stream {
             Ok(stream) => thread::spawn(|| handle_socket(stream)),
-            Err(e) => break,
+            Err(_e) => break,
         };
     }
     Ok(())
